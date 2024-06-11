@@ -17,7 +17,7 @@ def lambda_handler(event, context):
         http_method = event['httpMethod']
         
         if http_method == 'GET':
-            pass
+            logger.info("init commmit")
         else:
             return {
                 'statusCode': 405,
