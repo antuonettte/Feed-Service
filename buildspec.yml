@@ -10,18 +10,18 @@ phases:
     - cd ..
   build: 
     commands:
-      - echo "Zipping Search Service Deployment Package"
+      - echo "Zipping Feed Service Deployment Package"
       - cd lambdafunction
       - zip -r ../dependency_layer.zip python/
       - rm -rf python/
-      - zip -r ../search_service_build_package.zip lambda_function.py
+      - zip -r ../feed_service_build_package.zip lambda_function.py
       - cd ..
   post_build: 
     commands:
       - echo "Deploying to Lambda Function..."
-      - aws lambda update-function-code --function-name Search-Service --zip-file fileb://search_service_build_package.zip
+      - aws lambda update-function-code --function-name Feed-Service --zip-file fileb://feed_service_build_package.zip
       - echo "Lambda Deployed"
-      - layer_arn=$(aws lambda publish-layer-version --layer-name search-service-dependencies --zip-file fileb://dependency_layer.zip --output text --query 'LayerVersionArn')
+      - layer_arn=$(aws lambda publish-layer-version --layer-name feed-service-dependencies --zip-file fileb://dependency_layer.zip --output text --query 'LayerVersionArn')
       - echo "Layer Created"
-      - aws lambda update-function-configuration --function-name Search-Service --layers $layer_arn
+      - aws lambda update-function-configuration --function-name Feed-Service --layers $layer_arn
       - echo "Layer added"
