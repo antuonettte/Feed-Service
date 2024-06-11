@@ -1,2 +1,2 @@
-# Feed-Service
-Service for handling generating post feed
+# Search-Service
+Service allowing users to search
