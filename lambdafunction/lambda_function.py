@@ -54,7 +54,7 @@ def get_follower_ids(user_id):
         cursor.execute(follower_id_sql, (user_id))
         results = cursor.fetchall()
         logger.info("Follower IDs")
-        logger.info(result)
+        logger.info(results)
         
         return results
         
@@ -70,6 +70,8 @@ def generate_feed(event):
     logger.info("Generating Feed")
     query_parameters = event['queryStringParameters']
     
+    user_id = query_parameters.get('user_id')
+
     logger.info("query parameters")
     logger.info(query_parameters)
     
