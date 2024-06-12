@@ -30,7 +30,7 @@ phases:
       - aws lambda update-function-code --function-name Feed-Service --zip-file fileb://feed_service_build_package.zip
       - echo "Lambda Code Updated"
       - lambda_version=$(aws lambda publish-version --function-name Fedd-Service --output text --query 'Version')
-      - echo "Lambda Version Created: $lambda_version"
+      - echo "Lambda Version Created $lambda_version"
       - layer_arn=$(aws lambda publish-layer-version --layer-name feed-service-dependencies --zip-file fileb://dependency_layer.zip --output text --query 'LayerVersionArn')
       - echo "Layer Created"
       - aws lambda update-function-configuration --function-name Feed-Service --layers $layer_arn
