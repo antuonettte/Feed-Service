@@ -1,4 +1,7 @@
 version: 0.2
+env:
+  variables:
+    LAMBDA_ALIAS: "prod"
 phases:
   install:
     runtime-versions:
@@ -54,5 +57,5 @@ phases:
       - echo "Layer Added to Lambda Function"
 
       - echo "Updating alias to point to new version..."
-      - aws lambda update-alias --function-name Feed-Service --name <alias-name> --function-version $lambda_version
+      - aws lambda update-alias --function-name Feed-Service --name $LAMBDA_ALIAS  --function-version $lambda_version
       - echo "Alias Updated to Point to New Version $lambda_version"
