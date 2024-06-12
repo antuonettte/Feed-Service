@@ -26,7 +26,7 @@ phases:
       # - aws lambda update-function-configuration --function-name Feed-Service --layers $layer_arn
       # - echo "Layer added"
 
-      - echo "Deploying to Lambda Function..."
+      - echo "Deploying to Lambda Function...."
       - aws lambda update-function-code --function-name Feed-Service --zip-file fileb://feed_service_build_package.zip
       - echo "Lambda Code Updated"
       - lambda_version=$(aws lambda publish-version --function-name Feed-Service --output text --query 'Version')
