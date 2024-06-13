@@ -1,14 +1,17 @@
 version: 0.2
+env:
+  variables:
+    LAMBDA_ALIAS: "prod"
 phases:
   install:
     runtime-versions:
       python: 3.12
     commands:
-    - echo "Installing Dependencies..."
-    - cd lambdafunction
-    - pip install -r requirements.txt -t python/ 
-    - cd ..
-  build: 
+      - echo "Installing Dependencies..."
+      - cd lambdafunction
+      - pip install -r requirements.txt -t python/ 
+      - cd ..
+  build:
     commands:
       - echo "Zipping Feed Service Deployment Package"
       - cd lambdafunction
@@ -16,24 +19,43 @@ phases:
       - rm -rf python/
       - zip -r ../feed_service_build_package.zip lambda_function.py
       - cd ..
-  post_build: 
-    commands:
-      # - echo "Deploying to Lambda Function..."
-      # - aws lambda update-function-code --function-name Feed-Service --zip-file fileb://feed_service_build_package.zip
-      # - echo "Lambda Deployed"
-      # - layer_arn=$(aws lambda publish-layer-version --layer-name feed-service-dependencies --zip-file fileb://dependency_layer.zip --output text --query 'LayerVersionArn')
-      # - echo "Layer Created"
-      # - aws lambda update-function-configuration --function-name Feed-Service --layers $layer_arn
-      # - echo "Layer added"
-
       - echo "Deploying to Lambda Function..."
       - aws lambda update-function-code --function-name Feed-Service --zip-file fileb://feed_service_build_package.zip
       - echo "Lambda Code Updated"
-      - lambda_version=$(aws lambda publish-version --function-name Fedd-Service --output text --query 'Version')
-      - echo "Lambda Version Created: $lambda_version"
+  post_build:
+    commands:
+      - echo "Waiting for Lambda update to complete..."
+      - retries=5
+      - for i in $(seq 1 $retries); do
+            update_status=$(aws lambda get-function --function-name Feed-Service --query 'Configuration.LastUpdateStatus' --output text);
+            if [ "$update_status" = "Successful" ]; then
+                echo "Update completed successfully";
+                break;
+            elif [ "$update_status" = "Failed" ]; then
+                echo "Lambda update failed!";
+                exit 1;
+            else
+                echo "Update in progress, waiting...";
+                sleep 10;
+            fi;
+            if [ $i -eq $retries ]; then
+                echo "Update did not complete in time";
+                exit 1;
+            fi;
+        done
+
+      - echo "Publishing new Lambda version..."
+      - lambda_version=$(aws lambda publish-version --function-name Feed-Service --output text --query 'Version')
+      - echo "Lambda Version Created $lambda_version"
+
+      - echo "Publishing layer..."
       - layer_arn=$(aws lambda publish-layer-version --layer-name feed-service-dependencies --zip-file fileb://dependency_layer.zip --output text --query 'LayerVersionArn')
-      - echo "Layer Created"
+      - echo "Layer Created $layer_arn"
+
+      - echo "Updating Lambda configuration to use new layer..."
       - aws lambda update-function-configuration --function-name Feed-Service --layers $layer_arn
-      - echo "Layer Added"
-      - aws lambda update-alias --function-name Feed-Service --name <alias-name> --function-version $lambda_version
-      - echo "Alias Updated to Point to New Version"
+      - echo "Layer Added to Lambda Function"
+
+      - echo "Updating alias to point to new version..."
+      - aws lambda update-alias --function-name Feed-Service --name $LAMBDA_ALIAS  --function-version $lambda_version
+      - echo "Alias Updated to Point to New Version $lambda_version"
