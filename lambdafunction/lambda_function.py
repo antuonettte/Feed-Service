@@ -44,11 +44,21 @@ def lambda_handler(event, context):
         else:
             return {
                 'statusCode': 405,
+                'headers': {
+                      "Access-Control-Allow-Origin": "*", 
+                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                      "Access-Control-Allow-Credentials": 'true',
+                    },
                 'body': json.dumps({'error': 'Method Not Allowed'})
             }
     except Exception as e:
         return {
             'statusCode': 500,
+            'headers': {
+                      "Access-Control-Allow-Origin": "*", 
+                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                      "Access-Control-Allow-Credentials": 'true',
+                    },
             'body': json.dumps({'error': str(e)})
         }
         
@@ -79,6 +89,11 @@ def get_follower_ids(user_id):
         logger.error(str(e))
         return {
             'statusCode': 500,
+            'headers': {
+                      "Access-Control-Allow-Origin": "*", 
+                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                      "Access-Control-Allow-Credentials": 'true',
+                    },
             'body':json.dumps({'message':str(e)})
         }
     
@@ -128,10 +143,17 @@ def generate_feed(event):
         search_results = response.json()
         logger.info(search_results)
         
-        processed_results = process_search_results(search_results)
+        processed_results = process_search_results(search_results, user_id)
+        
+        logger.info(processed_results)
         
         return {
             'statusCode': 200,
+            'headers': {
+                      "Access-Control-Allow-Origin": "*", 
+                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                      "Access-Control-Allow-Credentials": 'true',
+                    },
             'body':json.dumps({"message": processed_results})
         }
         
@@ -140,6 +162,11 @@ def generate_feed(event):
         logger.error(str(e))
         return {
             'statusCode': 500,
+            'headers': {
+                      "Access-Control-Allow-Origin": "*", 
+                      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                      "Access-Control-Allow-Credentials": 'true',
+                    },
             'body':json.dumps({"error": str(e)})
         }
         
@@ -154,7 +181,7 @@ def get_post_ids(posts):
         
     return post_ids
     
-def process_search_results(results):
+def process_search_results(results, user_id):
     logger.info("Setting Variables")
     processed_results = defaultdict(list)
     posts = []
@@ -165,6 +192,12 @@ def process_search_results(results):
         post_ids = get_post_ids(results['hits']['hits'])
         
         if post_ids:
+            logger.info("Getting Likes for posts")
+            user_likes = get_user_likes(user_id)
+            
+            logger.info("Getting dislikes for posts")
+            user_dislikes = get_user_dislikes(user_id)
+            
             logger.info("Getting comments for the posts")
             comments = get_comments_by_post_id(post_ids)
             
@@ -176,7 +209,8 @@ def process_search_results(results):
                 if result['_index'] == "posts":
                     tmp_posts.append( result['_source'] )
             
-            posts = combine_posts_with_media(tmp_posts, comments, media_metadata)
+            posts = combine_posts_with_media(tmp_posts, comments, media_metadata, user_likes, user_dislikes)
+        
         
 
         processed_results['posts'] = posts
@@ -265,7 +299,35 @@ def get_comments_by_post_id(post_ids):
     finally:
         connection.close()
         
-def combine_posts_with_media(posts, comments, media_metadata):
+def get_user_likes(user_id):
+    connection = pymysql.connect(host=POSTS_DB_HOST,
+                                 user=POSTS_DB_USER,
+                                 password=POSTS_DB_PASSWORD,
+                                 database=POSTS_DB_NAME)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT post_id FROM likes WHERE user_id = %s", (user_id,))
+            likes = cursor.fetchall()
+        return {like[0] for like in likes}
+    except Exception as e:
+        logger.error(f"Error fetching user likes: {e}")
+        return set()
+        
+def get_user_dislikes(user_id):
+    connection = pymysql.connect(host=POSTS_DB_HOST,
+                                 user=POSTS_DB_USER,
+                                 password=POSTS_DB_PASSWORD,
+                                 database=POSTS_DB_NAME)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT post_id FROM dislikes WHERE user_id = %s", (user_id,))
+            dislikes = cursor.fetchall()
+        return {dislike[0] for dislike in dislikes}
+    except Exception as e:
+        logger.error(f"Error fetching user dislikes: {e}")
+        return set()
+        
+def combine_posts_with_media(posts, comments, media_metadata, user_likes, user_dislikes):
     logger.info("Combining media to the post")
     logger.info(media_metadata)
     media_dict = {}
@@ -274,9 +336,14 @@ def combine_posts_with_media(posts, comments, media_metadata):
         if post_id not in media_dict:
             media_dict[post_id] = []
         media_dict[post_id].append(media)
+        
+    logger.info(user_likes)
     
     for post in posts:
+        logger.info(post)
         post['media_metadata'] = media_dict.get(post['id'], [])
         post['comments'] = comments.get(post['id'],[])
+        post['likedByUser'] = post['id'] in user_likes
+        post['dislikedByUser'] = post['id'] in user_dislikes
     
     return posts
