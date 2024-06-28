@@ -4,26 +4,17 @@ import pymysql
 import logging
 from collections import defaultdict
 import requests
+import os
 
 # Constants
-db_host = 'car-network-db.c5kgayasi5x2.us-east-1.rds.amazonaws.com'
-db_user = 'admin'
-db_password = 'FrostGaming1!'
-db_name = 'user_db'
-
-POSTS_DB_HOST = 'car-network-db.c5kgayasi5x2.us-east-1.rds.amazonaws.com'
-POSTS_DB_USER = 'admin'
-POSTS_DB_PASSWORD = 'FrostGaming1!'
-POSTS_DB_NAME = 'post_db'
-
-MEDIA_DB_HOST = 'car-network-db.c5kgayasi5x2.us-east-1.rds.amazonaws.com'
-MEDIA_DB_USER = 'admin'
-MEDIA_DB_PASSWORD = 'FrostGaming1!'
-MEDIA_DB_NAME = 'media_metadata_db'
-
-COMMENT_DB_NAME = 'comment_db'
-
-DOMAIN_ENDPOINT = 'vpc-car-network-open-search-qkd46v7okrwchflkznxsldkx4y.aos.us-east-1.on.aws'
+DB_HOST = os.environ['DB_HOST']
+DB_USER = os.environ['DB_USER']
+DB_PASSWORD = os.environ['DB_PASSWORD']
+USER_DB_NAME = os.environ['USER_DB_NAME']
+POSTS_DB_NAME = os.environ['POST_DB_NAME']
+MEDIA_DB_NAME = os.environ['MEDIA_DB_NAME']
+COMMENT_DB_NAME = os.environ['COMMENT_DB_NAME']
+DOMAIN_ENDPOINT = os.environ['DOMAIN_ENDPOINT']
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -65,10 +56,10 @@ def lambda_handler(event, context):
         
 def get_follower_ids(user_id):
     conn = pymysql.connect(
-        host=db_host,
-        user=db_user,
-        password=db_password,
-        database=db_name
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=USER_DB_NAME
     )
     
     cursor = conn.cursor()
@@ -224,15 +215,15 @@ def get_media_metadata_by_post_ids(post_ids):
     if not post_ids:
         return []
     
-    connection = pymysql.connect(host=MEDIA_DB_HOST,
-                                 user=MEDIA_DB_USER,
-                                 password=MEDIA_DB_PASSWORD,
+    connection = pymysql.connect(host=DB_HOST,
+                                 user=DB_USER,
+                                 password=DB_PASSWORD,
                                  database=MEDIA_DB_NAME)
     logger.info("Get metadata for media in post")
     post_id_tuple = tuple(post_ids)
     try:
         with connection.cursor() as cursor:
-            sql = "select user_id, post_id, s3_key, url, size, type  from media_metadata where post_id in %s"
+            sql = "select user_id, post_id, s3_key, url, size, type, expiresAt from media_metadata where post_id in %s"
             cursor.execute(sql, (post_id_tuple,))
             results = cursor.fetchall()
             logger.info("media metadata")
@@ -245,7 +236,8 @@ def get_media_metadata_by_post_ids(post_ids):
                     "s3_key": media[2],
                     "url" : media[3],
                     "size": media[4],
-                    "type": media[5]
+                    "type": media[5],
+                    "expiresAt": media[6]
                 }
                 media_list.append(media_dict)
             logger.info("media list")
@@ -261,9 +253,9 @@ def get_comments_by_post_id(post_ids):
     if not post_ids:
         return []
     
-    connection = pymysql.connect(host=MEDIA_DB_HOST,
-                                 user=MEDIA_DB_USER,
-                                 password=MEDIA_DB_PASSWORD,
+    connection = pymysql.connect(host=DB_HOST,
+                                 user=DB_USER,
+                                 password=DB_PASSWORD,
                                  database=COMMENT_DB_NAME)
     logger.info("Get comments for posts")
     post_id_tuple = tuple(post_ids)
@@ -271,7 +263,7 @@ def get_comments_by_post_id(post_ids):
     logger.info(post_id_tuple)
     try:
         with connection.cursor() as cursor:
-            sql = "select id, user_id, post_id, content, created_at from comments where post_id in %s"
+            sql = "select id, user_id, post_id, content, created_at, username from comments where post_id in %s"
             cursor.execute(sql, (post_id_tuple,))
             results = cursor.fetchall()
             logger.info("post comments")
@@ -284,6 +276,7 @@ def get_comments_by_post_id(post_ids):
                     "id":comment[0],
                     "post_id":comment[2],
                     "user_id":comment[1],
+                    "username":comment[5],
                     "content":comment[3],
                     "created_at":comment[4].strftime('%Y-%m-%d %H:%M:%S')
                 }
@@ -300,9 +293,9 @@ def get_comments_by_post_id(post_ids):
         connection.close()
         
 def get_user_likes(user_id):
-    connection = pymysql.connect(host=POSTS_DB_HOST,
-                                 user=POSTS_DB_USER,
-                                 password=POSTS_DB_PASSWORD,
+    connection = pymysql.connect(host=DB_HOST,
+                                 user=DB_USER,
+                                 password=DB_PASSWORD,
                                  database=POSTS_DB_NAME)
     try:
         with connection.cursor() as cursor:
@@ -314,9 +307,9 @@ def get_user_likes(user_id):
         return set()
         
 def get_user_dislikes(user_id):
-    connection = pymysql.connect(host=POSTS_DB_HOST,
-                                 user=POSTS_DB_USER,
-                                 password=POSTS_DB_PASSWORD,
+    connection = pymysql.connect(host=DB_HOST,
+                                 user=DB_USER,
+                                 password=DB_PASSWORD,
                                  database=POSTS_DB_NAME)
     try:
         with connection.cursor() as cursor:
